@@ -1,6 +1,6 @@
 # vrchat-jellyfin
 
-[![Docker](https://github.com/gurrrrrrett3/vrchat-jellyfin/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/gurrrrrrett3/vrchat-jellyfin/actions/workflows/docker-publish.yml)
+[![Docker](https://github.com/orcachillin/vrchat-jellyfin/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/orcachillin/vrchat-jellyfin/actions/workflows/docker-publish.yml)
 
 a Jellyfin client designed for VRChat
 
@@ -37,7 +37,7 @@ Docker Compose (recommended):
 version: '3'
 services:
   vrchat-jellyfin:
-    image: ghcr.io/gurrrrrrett3/vrchat-jellyfin:master
+    image: ghcr.io/orcachillin/vrchat-jellyfin:master
     container_name: vrchat-jellyfin
     restart: unless-stopped
     ports:
@@ -67,7 +67,7 @@ docker run -d \
 -e VIDEO_BITRATE: 3000000 \
 -e MAX_HEIGHT: 720 \
 -e MAX_WIDTH: 1280 \
-ghcr.io/gurrrrrrett3/vrchat-jellyfin:master
+ghcr.io/orcachillin/vrchat-jellyfin:master
 ```
 
 ## Installation (No Docker)
