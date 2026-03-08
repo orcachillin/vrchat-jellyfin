@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   vrchat-jellyfin:
-    image: ghcr.io/gurrrrrrett3/vrchat-jellyfin:master
+    image: ghcr.io/orcachillin/vrchat-jellyfin:master
     container_name: vrchat-jellyfin
     restart: unless-stopped
     ports:
