@@ -6,9 +6,13 @@ a Jellyfin client designed for VRChat
 
 > [!IMPORTANT]
 >
-> ### Incomplete Project
+> ### What ships today
 >
-> While this project is functional, it is not yet complete. The end goal is to have a link that can be pasted into the vrchat client, then use the jellyfin cast feature to control the player like a chromecast. This is not yet implemented, and the current implementation is a workaround.
+> Browse Jellyfin libraries in a HeroUI web UI, pick subtitles, and mint a **capability stream URL** (`/v/<id>`) you paste into VRChat / ChilloutVR / Resonite. Artwork is proxied through this app (`/img/...`) so browsers never see Jellyfin hostnames or API keys. See [docs/capability-urls.md](docs/capability-urls.md).
+>
+> ### Still aspirational
+>
+> Jellyfin cast / Chromecast-style remote control of the in-world player is **not** implemented. Seeking and splash/instruction streams are also open. Today's mint-and-paste flow is the practical workaround until cast exists.
 
 handles requesting media from jellyfin in a format that can be played in vrchat, as well as proxying urls to bypass the risk of sharing a jellyfin api key
 
@@ -140,8 +144,8 @@ Go to the web interface (default port is 4000), select media, and copy the link.
 - [ ] Subtitle Baking
 - [ ] Audio track selection
 - [x] Subtitle track selection
-- [x] Temp Web interface
+- [x] HeroUI web interface (browse libraries, mint capability URLs, proxy artwork)
 - [ ] Support for the jellyfin cast api
 - [ ] Video Stream generation (splash screen with instructions, etc)
-- [x] Docker
+- [x] Docker / GHCR (`ghcr.io/orcachillin/vrchat-jellyfin`)
 - [ ] Seeking (not sure if this is possible)

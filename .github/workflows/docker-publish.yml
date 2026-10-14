@@ -13,13 +13,25 @@ on:
 env:
   # Use docker.io for Docker Hub if empty
   REGISTRY: ghcr.io
-  # github.repository as <account>/<repo>
-  IMAGE_NAME: ${{ github.repository }}
-
 
 jobs:
-  build:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install and test
+        run: |
+          npm ci
+          npm test
 
+  build:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,6 +43,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # GHCR requires lowercase image names (org may be mixed-case).
+      - name: Set lowercase image name
+        run: echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer

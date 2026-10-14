@@ -1,10 +1,23 @@
 // src/jellyfin/proxy/proxy.ts
 
-export default class Proxy {
-    public readonly id: string = Math.random().toString(36).substring(2, 15);
-    public readonly createdAt: Date = new Date();
+import { randomBytes } from "crypto";
 
-    constructor(public itemId: string, public options?: ProxyOptions) { } // Modified to accept options
+/** 24 bytes = 192 bits entropy (W3C TAG capability-URL guidance: >= 120 bits). */
+const CAPABILITY_ID_BYTES = 24;
+
+export default class Proxy {
+    public readonly id: string;
+    public readonly createdAt: Date;
+
+    constructor(
+        public itemId: string,
+        public options?: ProxyOptions,
+        id?: string,
+        createdAt?: Date,
+    ) {
+        this.id = id ?? randomBytes(CAPABILITY_ID_BYTES).toString("base64url");
+        this.createdAt = createdAt ?? new Date();
+    }
 }
 
 export interface ProxyOptions {
@@ -25,4 +38,11 @@ export enum SubtitleMethod {
     External = "External",
     Hls = "Hls",
     Drop = "Drop",
+}
+
+export interface PersistedProxy {
+    id: string;
+    itemId: string;
+    createdAt: string;
+    options?: ProxyOptions;
 }

@@ -3,9 +3,15 @@
 import { Api, Jellyfin } from "@jellyfin/sdk";
 import { getUserViewsApi } from "@jellyfin/sdk/lib/utils/api/user-views-api";
 import { getItemsApi } from "@jellyfin/sdk/lib/utils/api/items-api";
+import { ItemFields } from "@jellyfin/sdk/lib/generated-client/models/item-fields";
 import fetch from "node-fetch";
 import { resolve } from "path";
-import { ProxyOptions, SubtitleMethod } from "./proxy/proxy"; // Added import
+import { ProxyOptions, SubtitleMethod } from "./proxy/proxy";
+import {
+    buildPublicImageUrl,
+    buildUpstreamImageUrl,
+    ImageUrlOptions,
+} from "./imageUrl";
 
 const encodingSettings: Record<string, string> = require(resolve("./encodingSettings.js")).encodingSettings;
 
@@ -40,13 +46,14 @@ export default class JellyfinClient {
     }
 
     public async authenticate() {
-        const auth = await this._api.authenticateUserByName(this.username, this.password).catch((e) => {
+        try {
+            const auth = await this._api.authenticateUserByName(this.username, this.password);
+            this.userId = auth.data.User?.Id;
+            return auth.status == 200;
+        } catch (e) {
             console.error("Failed to authenticate with Jellyfin, check your username and password", e);
-            process.exit(1);
-        });
-
-        this.userId = auth.data.User?.Id;
-        return auth.status == 200;
+            return false; // Return false instead of exiting
+        }
     }
 
     public async getPlayableMedia() {
@@ -165,6 +172,133 @@ export default class JellyfinClient {
         }
 
         return item;
+    }
+
+    // New methods for modern UI
+    public async getLibraries() {
+        const viewsResponse = await getUserViewsApi(this._api).getUserViews({
+            userId: this.userId!,
+        });
+
+        const views = viewsResponse.data.Items || [];
+        return views.map(view => ({
+            itemId: view.Id,
+            name: view.Name,
+            type: view.CollectionType,
+            thumbnailUrl: this.getImageUrl(view.Id!, 'Primary', view.ImageTags),
+        }));
+    }
+
+    public async getLibraryItems(libraryId: string, searchTerm?: string, limit: number = 50, offset: number = 0) {
+        const itemsResponse = await getItemsApi(this._api).getItems({
+            userId: this.userId!,
+            parentId: libraryId,
+            searchTerm,
+            limit,
+            startIndex: offset,
+            fields: [ItemFields.PrimaryImageAspectRatio, ItemFields.MediaStreams],
+        });
+
+        const items = itemsResponse.data.Items || [];
+        return items.map(item => ({
+            itemId: item.Id,
+            name: item.Name,
+            type: item.Type,
+            thumbnailUrl: this.getImageUrl(item.Id!, 'Primary', item.ImageTags),
+            hasSubtitles: (item.MediaStreams || []).some(stream => stream.Type === 'Subtitle'),
+            subtitles: (item.MediaStreams || [])
+                .filter(stream => stream.Type === 'Subtitle')
+                .map(stream => ({
+                    index: stream.Index,
+                    language: stream.Language || 'Unknown',
+                })),
+        }));
+    }
+
+    public async getTVShowSeasons(showId: string) {
+        const seasonsResponse = await getItemsApi(this._api).getItems({
+            userId: this.userId!,
+            parentId: showId,
+            fields: [ItemFields.PrimaryImageAspectRatio],
+        });
+
+        const seasons = seasonsResponse.data.Items || [];
+        return seasons.map(season => ({
+            itemId: season.Id,
+            name: season.Name,
+            index: season.IndexNumber,
+            thumbnailUrl: this.getImageUrl(season.Id!, 'Primary', season.ImageTags),
+        }));
+    }
+
+    public async getSeasonEpisodes(seasonId: string) {
+        const episodesResponse = await getItemsApi(this._api).getItems({
+            userId: this.userId!,
+            parentId: seasonId,
+            fields: [ItemFields.PrimaryImageAspectRatio, ItemFields.MediaStreams],
+        });
+
+        const episodes = episodesResponse.data.Items || [];
+        return episodes.map(episode => ({
+            itemId: episode.Id,
+            name: episode.Name,
+            index: episode.IndexNumber,
+            thumbnailUrl: this.getImageUrl(episode.Id!, 'Primary', episode.ImageTags),
+            hasSubtitles: (episode.MediaStreams || []).some(stream => stream.Type === 'Subtitle'),
+            subtitles: (episode.MediaStreams || [])
+                .filter(stream => stream.Type === 'Subtitle')
+                .map(stream => ({
+                    index: stream.Index,
+                    language: stream.Language || 'Unknown',
+                })),
+        }));
+    }
+
+    public async getItemDetails(itemId: string) {
+        const itemResponse = await getItemsApi(this._api).getItems({
+            userId: this.userId!,
+            ids: [itemId],
+            fields: [ItemFields.PrimaryImageAspectRatio, ItemFields.MediaStreams],
+        });
+
+        const item = itemResponse.data.Items?.[0];
+        if (!item) return null;
+
+        return {
+            itemId: item.Id,
+            name: item.Name,
+            type: item.Type,
+            thumbnailUrl: this.getImageUrl(item.Id!, 'Primary', item.ImageTags),
+            subtitles: (item.MediaStreams || [])
+                .filter(stream => stream.Type === 'Subtitle')
+                .map(stream => ({
+                    index: stream.Index,
+                    language: stream.Language || 'Unknown',
+                })),
+        };
+    }
+
+    /**
+     * Browser-safe thumbnail path proxied by this app (`/img/:itemId`).
+     * Never includes Jellyfin hostnames or api_key.
+     */
+    private getImageUrl(
+        itemId: string,
+        imageType: string,
+        imageTags?: { [key: string]: string } | null,
+    ): string | null {
+        const tag = imageTags?.[imageType];
+        return buildPublicImageUrl(itemId, imageType, tag ? { tag } : {});
+    }
+
+    /** Server-side fetch of a Jellyfin item image (credential stays here). */
+    public async getItemImage(itemId: string, imageType: string, options: ImageUrlOptions = {}) {
+        const url = buildUpstreamImageUrl(this.serverUrl, itemId, imageType, this.apiKey, options);
+        return fetch(url, {
+            headers: {
+                "User-Agent": JellyfinClient.APP_NAME,
+            },
+        });
     }
 }
 

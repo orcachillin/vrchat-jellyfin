@@ -2,11 +2,6 @@ import JellyfinClient from "./client";
 
 export const client = new JellyfinClient(process.env.JELLYFIN_HOST!, process.env.JELLYFIN_USERNAME!, process.env.JELLYFIN_PASSWORD!);
 
-client.authenticate().then(async (success) => {
-
-    if (!success) {
-        console.error("Failed to authenticate with Jellyfin server");
-        process.exit(1);
-    }
-
-});
+// Note: Authentication is now handled in the webserver startup
+// This prevents the process from exiting on auth failure during development
+console.log("Jellyfin client initialized - authentication will be handled by webserver");
