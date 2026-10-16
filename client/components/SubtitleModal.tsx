@@ -15,16 +15,16 @@ interface SubtitleModalProps {
 }
 
 function SubtitleModal({ isOpen, onClose, itemId, itemName, subtitles }: SubtitleModalProps) {
-  const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState<number | null>(null);
   const [generatedUrl, setGeneratedUrl] = useState<string>('');
-  const [loading, setLoading] = useState(false);
+  // Which option is currently minting: null = idle, -1 = "No Subtitles", else the track index
+  const [loadingTarget, setLoadingTarget] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setSelectedSubtitleIndex(null);
       setGeneratedUrl('');
+      setLoadingTarget(null);
       setError(null);
       setCopied(false);
     }
@@ -50,7 +50,7 @@ function SubtitleModal({ isOpen, onClose, itemId, itemName, subtitles }: Subtitl
   };
 
   const handleSubtitleSelect = async (subtitleIndex: number | null) => {
-    setLoading(true);
+    setLoadingTarget(subtitleIndex === null ? -1 : subtitleIndex);
     setError(null);
 
     try {
@@ -73,7 +73,6 @@ function SubtitleModal({ isOpen, onClose, itemId, itemName, subtitles }: Subtitl
       const url = `${window.location.origin}/v/${proxyId}`;
 
       setGeneratedUrl(url);
-      setSelectedSubtitleIndex(subtitleIndex);
 
       // Auto-copy to clipboard
       if (navigator.clipboard) {
@@ -85,7 +84,7 @@ function SubtitleModal({ isOpen, onClose, itemId, itemName, subtitles }: Subtitl
       console.error('Error creating proxy:', err);
       setError('Failed to generate streaming URL. Please try again.');
     } finally {
-      setLoading(false);
+      setLoadingTarget(null);
     }
   };
 
@@ -112,6 +111,12 @@ function SubtitleModal({ isOpen, onClose, itemId, itemName, subtitles }: Subtitl
             </p>
           </div>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-900/20 border border-red-600 rounded-lg" role="alert">
+              <p className="text-red-400 text-sm">{error}</p>
+            </div>
+          )}
+
           {!generatedUrl ? (
             <div className="space-y-3">
               {/* No subtitles option */}
@@ -126,7 +131,7 @@ function SubtitleModal({ isOpen, onClose, itemId, itemName, subtitles }: Subtitl
                       <span className="text-lg">🏳️</span>
                       <span className="font-medium">No Subtitles</span>
                     </div>
-                    {loading && selectedSubtitleIndex === null && (
+                    {loadingTarget === -1 && (
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
                     )}
                   </div>
@@ -154,7 +159,7 @@ function SubtitleModal({ isOpen, onClose, itemId, itemName, subtitles }: Subtitl
                           </span>
                         </div>
                       </div>
-                      {loading && selectedSubtitleIndex === subtitle.index && (
+                      {loadingTarget === subtitle.index && (
                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
                       )}
                     </div>
@@ -192,12 +197,6 @@ function SubtitleModal({ isOpen, onClose, itemId, itemName, subtitles }: Subtitl
                   </Button>
                 </div>
               </div>
-
-              {error && (
-                <div className="p-3 bg-red-900/20 border border-red-600 rounded-lg">
-                  <p className="text-red-400 text-sm">{error}</p>
-                </div>
-              )}
             </div>
           )}
         </ModalBody>
