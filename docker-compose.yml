@@ -19,8 +19,18 @@ services:
       - MAX_AUDIO_CHANNELS=${MAX_AUDIO_CHANNELS:-2}
       - MAX_HEIGHT=${MAX_HEIGHT:-1080}
       - MAX_WIDTH=${MAX_WIDTH:-1920}
+
+      # Capability stream URLs
+      - WEBSERVER_PORT=${WEBSERVER_PORT:-4000}
+      - PROXY_STORE_PATH=/data/proxies.json
+      - PROXY_TTL_MS=${PROXY_TTL_MS:-86400000}
+      - JELLYFIN_AUTH_RETRIES=${JELLYFIN_AUTH_RETRIES:-30}
+      - JELLYFIN_AUTH_RETRY_MS=${JELLYFIN_AUTH_RETRY_MS:-5000}
+    volumes:
+      # Persist minted capability URLs across container recreates
+      - ./data:/data
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
