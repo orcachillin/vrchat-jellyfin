@@ -107,21 +107,31 @@ app.get("/items/:itemId/details", requireJellyfin, async (req, res) => {
 // Auth lifecycle: token is the capability; after PROXY_TTL_MS expiry there is no refresh —
 // operator must re-mint via this endpoint. See docs/capability-urls.md.
 app.post("/i/:id", requireJellyfin, async (req, res) => {
-    const itemId = req.params.id;
-    const { subtitleStreamIndex } = req.body;
+    try {
+        const itemId = req.params.id;
+        const { subtitleStreamIndex } = req.body ?? {};
 
-    const proxyOptions: ProxyOptions = {};
+        const proxyOptions: ProxyOptions = {};
 
-    if (subtitleStreamIndex != null) {
-        proxyOptions.subtitleStreamIndex = subtitleStreamIndex;
-        proxyOptions.subtitleMethod = SubtitleMethod.Encode;
+        if (subtitleStreamIndex != null) {
+            const parsed = Number(subtitleStreamIndex);
+            if (!Number.isInteger(parsed) || parsed < 0) {
+                res.status(400).json({ error: "subtitleStreamIndex must be a non-negative integer" });
+                return;
+            }
+            proxyOptions.subtitleStreamIndex = parsed;
+            proxyOptions.subtitleMethod = SubtitleMethod.Encode;
+        }
+
+        const proxy = ProxyManager.createProxy(itemId, proxyOptions);
+        res.json({
+            id: proxy.id,
+            expiresAt: new Date(proxy.createdAt.getTime() + ProxyManager.PROXY_TIMEOUT).toISOString(),
+        });
+    } catch (error) {
+        console.error("Error minting capability URL:", error);
+        res.status(500).json({ error: "Failed to mint stream URL" });
     }
-
-    const proxy = ProxyManager.createProxy(itemId, proxyOptions);
-    res.json({
-        id: proxy.id,
-        expiresAt: new Date(proxy.createdAt.getTime() + ProxyManager.PROXY_TIMEOUT).toISOString(),
-    });
 });
 
 // Proxy Jellyfin artwork. Browser only ever sees /img/... — api_key stays server-side.
@@ -220,23 +230,41 @@ app.get("/v/:id", async (req, res) => {
     }
 });
 
+// SPA fallback: the client router owns deep links such as /library/:libraryId,
+// so a refresh on one of those pages must serve the app shell, not a 404.
+// API and capability paths are excluded so they keep returning their own responses.
+const NON_SPA_PREFIXES = ["/assets", "/libraries", "/tvshows", "/seasons", "/items", "/subtitles", "/img", "/v"];
+app.get("*", (req, res) => {
+    const isNonSpa = NON_SPA_PREFIXES.some(
+        (prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`),
+    );
+    if (isNonSpa) {
+        res.status(404).send("Not found");
+        return;
+    }
+    res.sendFile("index.html", { root: "dist/client" });
+});
+
 async function authenticateWithRetry() {
     const maxAttempts = parseInt(process.env.JELLYFIN_AUTH_RETRIES || "30", 10);
     const delayMs = parseInt(process.env.JELLYFIN_AUTH_RETRY_MS || "5000", 10);
+    // After the fast attempts run out, keep polling slowly instead of giving up,
+    // so a long jellyfin outage self-heals without needing a manual restart.
+    const slowDelayMs = Math.max(delayMs, 60_000);
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let attempt = 0;
+    for (;;) {
+        attempt++;
         const success = await client.authenticate();
         if (success) {
             jellyfinReady = true;
             console.log("Jellyfin authentication ready");
             return;
         }
-        console.error(
-            `Jellyfin auth failed (attempt ${attempt}/${maxAttempts}); retrying in ${delayMs}ms`,
-        );
-        await new Promise((r) => setTimeout(r, delayMs));
+        const waitMs = attempt < maxAttempts ? delayMs : slowDelayMs;
+        console.error(`Jellyfin auth failed (attempt ${attempt}/${maxAttempts}); retrying in ${waitMs}ms`);
+        await new Promise((r) => setTimeout(r, waitMs));
     }
-    console.error("Jellyfin authentication exhausted retries; API routes will stay 503");
 }
 
 ProxyManager.init();
