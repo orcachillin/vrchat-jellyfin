@@ -2,7 +2,7 @@
 
 Public `/v/:id` links are **capability URLs** (W3C TAG finding): possession of the URL is authorization to stream that item until expiry. That model fits VRChat and similar clients that can only do a bare HTTPS GET (no cookies, no OAuth dance on the video player).
 
-If you put this app behind an auth proxy (Cloudflare Access, Authelia, basic auth, etc.), keep `/v/*` reachable by the VR clients while gating the browse/mint UI.
+If you put this app behind an auth proxy (Cloudflare Access, Authelia, basic auth, etc.), keep `/v/*` reachable by the VR clients while gating everything else. That includes the browse endpoints (`/libraries`, `/tvshows`, `/seasons`, `/items`), the mint endpoint (`POST /i/:id`), and the artwork proxy (`/img/*`), which are only ever used by the gated UI.
 
 ## Auth lifecycle
 
@@ -17,7 +17,7 @@ HMAC query params are **not** required: the path token already has high entropy.
 
 - File: `PROXY_STORE_PATH` (default `./data/proxies.json`)
 - Survives process restart within TTL
-- Mount a volume in compose so container recreates do not drop active links
+- The bundled `docker-compose.yml` mounts `./data:/data` and sets `PROXY_STORE_PATH=/data/proxies.json`, so links also survive a container recreate
 
 ## Operator env
 
